@@ -10,7 +10,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { st, T, $ } from './state.mjs';
 
 export const QUALITY = {
-  low: { dpr: 1, shadow: 1024, soft: false, post: false, bloom: false, ao: false, grass: 0, water: 0, trees: 0.7, aa: true },
+  low: { dpr: 1, shadow: 1024, soft: false, post: false, bloom: false, ao: false, grass: 0, water: 0, trees: 0.7, aa: true, tstep: 2 },
   medium: { dpr: 1.25, shadow: 2048, soft: false, post: true, bloom: true, ao: false, grass: 28000, water: 256, trees: 1, aa: true },
   high: { dpr: 1.5, shadow: 2048, soft: true, post: true, bloom: true, ao: false, grass: 70000, water: 512, trees: 1, aa: true },
   ultra: { dpr: 2, shadow: 4096, soft: true, post: true, bloom: true, ao: true, grass: 110000, water: 1024, trees: 1, aa: true },
@@ -102,7 +102,20 @@ export function resize() {
   camera.updateProjectionMatrix();
   if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
 }
+// Frame pacing: when the GPU is still busy with the last two frames, skip drawing this one instead of queueing more
+// work. A slow GPU then drops frames rather than falling seconds behind (and stalling everything that has to wait for it).
+const fences = [];
 export function render(time) {
+  const gl = T.renderer.getContext();
+  const paced = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+  if (paced) {
+    try {
+      while (fences.length && gl.getSyncParameter(fences[0], gl.SYNC_STATUS) === gl.SIGNALED) gl.deleteSync(fences.shift());
+      if (fences.length >= 2) return false;
+    } catch (e) { fences.length = 0; }
+  }
   if (T.composer) { if (T.grade) T.grade.uniforms.uTime.value = time; T.composer.render(); }
   else T.renderer.render(T.scene, T.camera);
+  if (paced) { const f = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); if (f) fences.push(f); }
+  return true;
 }

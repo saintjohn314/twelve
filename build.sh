@@ -5,4 +5,5 @@ cat src/p1_core.js src/p2_world.js src/p3_acts.js src/p4_social.js src/p5_life.j
 cat src/v1_scene.js src/v2_live.js src/v3_ui.js > public/view.mjs
 node --check public/sim.mjs
 node --check public/view.mjs
+for f in public/v/*.mjs; do node --check "$f"; done
 echo built

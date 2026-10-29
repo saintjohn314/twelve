@@ -49,7 +49,8 @@ function windify(mat, kind) {
 
 /* ---------- build ---------- */
 export function buildWorld() {
-  if (R.world) { T.scene.remove(R.world); R.world.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(m => m.dispose()); }); }
+  // dispose the old world a little later, after the new one has drawn: its materials keep the shader programs alive, so nothing recompiles
+  if (R.world) { const old = R.world; T.scene.remove(old); setTimeout(() => old.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach(m => m.dispose()); }), 5000); }
   R.world = new THREE.Group();
   T.scene.add(R.world);
   if (!TX) TX = makeTextures();
@@ -106,6 +107,7 @@ function buildSky() {
   R.starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false });
   R.stars = new THREE.Points(g, R.starMat);
   R.world.add(R.stars);
+  if ((T.q.water || 128) < 256) R.noReflect.push(R.stars);     // a coarse reflection turns each star into a block
   R.moonSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: TX.glow, color: 0xe8eeff, transparent: true, opacity: 0, fog: false, depthWrite: false }));
   R.moonSprite.scale.setScalar(110);
   R.world.add(R.moonSprite);
@@ -134,7 +136,7 @@ function biome(x, z, h, ny, out) {
   return h > 1.45 && ny > 0.82 ? 1 : 0;
 }
 function buildTerrain() {
-  const RES = Math.round(2 * B / 1.0);
+  const RES = Math.round(2 * B / (T.q.tstep || 1));
   const geo = new THREE.PlaneGeometry(2 * B, 2 * B, RES, RES);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position, nv = pos.count;
@@ -174,7 +176,7 @@ export function paintGround(camps, paths) {
   col.array.set(base);
   const dirt = COL.dirt;
   const paint = (x, z, r, k) => {
-    const RES = Math.round(2 * B), step = 2 * B / RES;
+    const RES = Math.round(2 * B / (T.q.tstep || 1)), step = 2 * B / RES;
     const i0 = clamp(Math.floor((x - r + B) / step), 0, RES), i1 = clamp(Math.ceil((x + r + B) / step), 0, RES);
     const j0 = clamp(Math.floor((z - r + B) / step), 0, RES), j1 = clamp(Math.ceil((z + r + B) / step), 0, RES);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
